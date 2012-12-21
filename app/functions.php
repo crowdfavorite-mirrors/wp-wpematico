@@ -44,7 +44,7 @@ class WPeMatico_functions {
 		return round($bytes, $precision) . ' ' . $units[$pow];
 	}
 
-	//************************* CARGA CAMPAÑASS *******************************************************
+	//************************* CARGA CAMPAÃ‘ASS *******************************************************
  /**
    * Load all campaigns data
    * 
@@ -65,7 +65,7 @@ class WPeMatico_functions {
 		return $campaigns_data;
 	}
  
-	//************************* CARGA CAMPAÑA *******************************************************
+	//************************* CARGA CAMPAÃ‘A *******************************************************
  /**
    * Load campaign data
    * Required @param   integer  $post_id    Campaign ID to load
@@ -78,13 +78,13 @@ class WPeMatico_functions {
 			$campaign = get_post($post_id);
 		}
 		$campaign_data = get_post_meta( $post_id , 'campaign_data' );
-		$campaign_data = $campaign_data[0];
+		$campaign_data = @$campaign_data[0];
 		$campaign_data['campaign_id'] = $post_id;
 		$campaign_data['campaign_title'] = get_the_title($post_id);
 		return $campaign_data;
 	}
 	
-	//************************* GUARDA CAMPAÑA *******************************************************
+	//************************* GUARDA CAMPAÃ‘A *******************************************************
  /**
    * save campaign data
    * Required @param   integer  $post_id    Campaign ID to load
@@ -94,12 +94,26 @@ class WPeMatico_functions {
    **/	
 	public function update_campaign( $post_id , $campaign = array() ) {
 		$campaign['cronnextrun']= WPeMatico :: time_cron_next($campaign['cron']);
+		
+			// *** Campaign Rewrites	
+		// Proceso los rewrites agrego slashes	
+		if (isset($campaign['campaign_rewrites']['origin']))
+			for ($i = 0; $i < count($campaign['campaign_rewrites']['origin']); $i++) {
+				$campaign['campaign_rewrites']['origin'][$i] = addslashes($campaign['campaign_rewrites']['origin'][$i]);
+				$campaign['campaign_rewrites']['rewrite'][$i] = addslashes($campaign['campaign_rewrites']['rewrite'][$i]);
+				$campaign['campaign_rewrites']['relink'][$i] = addslashes($campaign['campaign_rewrites']['relink'][$i]);
+			}
+		if (isset($campaign['campaign_wrd2cat']['word']))
+			for ($i = 0; $i < count($campaign['campaign_wrd2cat']['word']); $i++) {
+				$campaign['campaign_wrd2cat']['word'][$i] = addslashes($campaign['campaign_wrd2cat']['word'][$i]);
+			}
+				
 		return add_post_meta( $post_id, 'campaign_data', $campaign, true )  or
           update_post_meta( $post_id, 'campaign_data', $campaign );
 		  
 	}
 	
-	/*********** 	 Funciones para procesar campañas ******************/
+	/*********** 	 Funciones para procesar campaÃ±as ******************/
 	//DoJob
 	function wpematico_dojob($jobid) {
 		global $campaign_log_message;
@@ -149,14 +163,19 @@ class WPeMatico_functions {
    * @return  SimplePie_Item    Feed object
    **/
   function fetchFeed($url, $stupidly_fast = false, $max = 0) {  # SimplePie
-	if (!class_exists('SimplePie')) {
-		if (is_file( ABSPATH . WPINC . '/class-simplepie.php'))
-			include_once( ABSPATH. WPINC . '/class-simplepie.php' );
-		else if (is_file( ABSPATH.'wp-admin/includes/class-simplepie.php'))
-			include_once( ABSPATH.'wp-admin/includes/class-simplepie.php' );
-		else
-			include_once( dirname( __FILE__) . '/lib/simplepie.inc.php' );
-	}		
+	$cfg = get_option(WPeMatico :: OPTION_KEY);
+	if ( $cfg['force_mysimplepie']){
+		include_once( dirname( __FILE__) . '/lib/simplepie.inc.php' );
+	}else{
+		if (!class_exists('SimplePie')) {
+			if (is_file( ABSPATH . WPINC . '/class-simplepie.php'))
+				include_once( ABSPATH. WPINC . '/class-simplepie.php' );
+			else if (is_file( ABSPATH.'wp-admin/includes/class-simplepie.php'))
+				include_once( ABSPATH.'wp-admin/includes/class-simplepie.php' );
+			else
+				include_once( dirname( __FILE__) . '/lib/simplepie.inc.php' );
+		}		
+	}
     $feed = new SimplePie();
     $feed->enable_order_by_date(false);
     $feed->set_feed_url($url);

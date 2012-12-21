@@ -3,7 +3,7 @@
 if ( !defined('ABSPATH') ) 
 	die('-1');
 
-$cfg = $this->options;  ?>
+$cfg = $this->check_options($this->options);  ?>
 <div class="wrap">
 	<h2><?php _e( 'WPeMatico settings', self :: TEXTDOMAIN );?></h2>
 	<div id="poststuff" class="metabox-holder has-right-sidebar">
@@ -14,13 +14,18 @@ $cfg = $this->options;  ?>
 				<div class="postbox inside">
 					<h3 class="handle"><?php _e( 'About', self :: TEXTDOMAIN );?></h3>
 					<div class="inside">
-						<p>WPeMatico Free Version <?php echo self :: VERSION ; ?> R<?php echo self :: RELEASE ; ?></p>
+						<p id="left1" onmouseover="this.style.background =  '#111';" onmouseout="this.style.background =  '#FFF';" style="text-align:center; background-color: rgb(255, 255, 255); background-position: initial initial; background-repeat: initial initial; "><a href="http://www.wpematico.com" title="Go to new WPeMatico WebSite"><img style="background: transparent;border-radius: 15px;width: 258px;" src="http://www.netmdp.com/wpematicofiles/bannerWPematico.png" title=""></a><br />
+						WPeMatico Free Version <?php echo self :: VERSION ; ?> R<?php echo self :: RELEASE ; ?></p>
 						<p><?php _e( 'Thanks for test, use and enjoy this plugin.', self :: TEXTDOMAIN );?></p>
 						<p><?php _e( 'If you like it, I really appreciate a donation.', self :: TEXTDOMAIN );?></p>
 						<p>
 						<input type="button" class="button-primary" name="donate" value="<?php _e( 'Click for Donate', self :: TEXTDOMAIN );?>" onclick="javascript:window.open('https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=B8V39NWK3NFQU');return false;"/>
 						</p>
 						<p><?php // _e('Help', self :: TEXTDOMAIN ); ?><a href="#" onclick="javascript:window.open('https://www.paypal.com/ar/cgi-bin/webscr?cmd=xpt/Marketing/general/WIPaypal-outside','WIPaypal','toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=yes, resizable=yes, width=700, height=600');"><img  src="https://www.paypal.com/es_XC/Marketing/i/logo/bnr_airlines1_205x67.gif" border="0" alt="Paypal Help"></a>
+						</p>
+						<p></p>
+						<p>
+						<input type="button" class="button-primary" name="buypro" value="<?php _e( 'Buy PRO version online', self :: TEXTDOMAIN );?>" onclick="javascript:window.open('http://www.wpematico.com/wpematico/');return false;"/>
 						</p>
 						<p></p>
 					</div>
@@ -53,6 +58,14 @@ $cfg = $this->options;  ?>
 
 					</div>
 				</div>
+				
+				<div class="postbox inside">
+					<div class="inside">
+						<p>
+						<input type="submit" class="button-primary" name="submit" value="<?php _e( 'Save settings', self :: TEXTDOMAIN );?>" />
+						</p>
+					</div>
+				</div>
 				<div class="postbox inside">
 					<h3 class="handle"><?php _e( 'Advanced', self :: TEXTDOMAIN );?></h3>
 					<div class="inside">
@@ -75,13 +88,7 @@ $cfg = $this->options;  ?>
 						<p></p>
 					</div>
 				</div>
-				<div class="postbox inside">
-					<div class="inside">
-						<p>
-						<input type="submit" class="button-primary" name="submit" value="<?php _e( 'Save settings', self :: TEXTDOMAIN );?>" />
-						</p>
-					</div>
-				</div>
+				
 			</div>
 		</div>
 		<div id="post-body">
@@ -91,15 +98,24 @@ $cfg = $this->options;  ?>
 			<div id="imgs" class="postbox">
 				<h3 class="hndle"><span><?php _e('Images', self :: TEXTDOMAIN ); ?></span></h3>
 				<div class="inside">
-					<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['imgcache'],true); ?> name="imgcache" id="imgcache" /><b>&nbsp;<?php _e('Cache Images.', self :: TEXTDOMAIN ); ?></b><br />
-					<div id="hlpimg" style="padding-left:20px;"><b><?php _e('Image Caching', self :: TEXTDOMAIN ); ?>:</b> <?php _e('When image caching is on, a copy of every image found in content of every feed (only in &lt;img&gt; tags) is downloaded to the Wordpress UPLOADS Dir.', self :: TEXTDOMAIN ); ?><br />
+					<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['imgcache'],true); ?> name="imgcache" id="imgcache" /><b>&nbsp;<?php echo '<label for="imgcache">' . __('Cache Images.', self :: TEXTDOMAIN ) . '</label>'; ?></b><br />
+					<div id="hlpimg" style="padding-left:20px;font-size:10px;"><b><?php _e('Image Caching', self :: TEXTDOMAIN ); ?>:</b> <?php _e('When image caching is on, a copy of every image found in content of every feed (only in &lt;img&gt; tags) is downloaded to the Wordpress UPLOADS Dir.', self :: TEXTDOMAIN ); ?><br />
 					<?php _e('If not enabled all images will linked to the image owner\'s server, but also make your website faster for your visitors.', self :: TEXTDOMAIN ); ?><br />
 					<b><?php _e('Caching all images', self :: TEXTDOMAIN ); ?>:</b> <?php _e('This featured in the general Settings section, will be overridden for the campaign-specific options.', self :: TEXTDOMAIN ); ?></div>
 					<p></p>
-					<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['imgattach'],true); ?> name="imgattach" id="imgattach" /><b>&nbsp;<?php _e('Attach Images to posts.', self :: TEXTDOMAIN ); ?></b><br />
+					<div id="nolinkimg" style="padding-left:20px; <?php if (!$cfg['imgcache']) echo 'display:none;';?>">
+						<input name="gralnolinkimg" id="gralnolinkimg" class="checkbox" value="1" type="checkbox" <?php checked($cfg['gralnolinkimg'],true); ?> />
+						<b><?php echo '<label for="gralnolinkimg">' . __('No link to source images', self :: TEXTDOMAIN ) . '</label>'; ?></b><br />
+						<b><?php _e("Note",  self :: TEXTDOMAIN ) ?>:</b> <?php _e('If selected and image upload get error, then delete the "src" attribute of the &lt;img&gt;. Check this for don\'t link images from external sites.', self :: TEXTDOMAIN ) ?>
+					</div>
+					<p></p>
+					<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['imgattach'],true); ?> name="imgattach" id="imgattach" /><b>&nbsp;<?php echo '<label for="imgattach">' . __('Attach Images to posts.', self :: TEXTDOMAIN ) . '</label>'; ?></b><br />
 					<div id="hlpatt" style="padding-left:20px;"><b><?php _e('Image Attaching', self :: TEXTDOMAIN ); ?>:</b> <?php _e('By default when image caching is on (and everything is working fine), a copy of every image found is added to Wordpress Media.', self :: TEXTDOMAIN ); ?><br />
 					<?php _e('If enabled Image Attaching all images will be attached to the owner post in WP media library; but if you see that the job process is too slowly you can deactivate this here.', self :: TEXTDOMAIN ); ?></div>
-					
+					<p></p>
+					<div id="featimg" style="padding-left:20px; <?php if (!$cfg['imgattach']) echo 'display:none;';?>">
+						<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['featuredimg'],true); ?> name="featuredimg" id="featuredimg" /><b>&nbsp;<?php echo '<label for="featuredimg">' . __('Enable first image found on content as Featured Image.', self :: TEXTDOMAIN ) . '</label>'; ?></b> <small> Read about <a href="http://codex.wordpress.org/Post_Thumbnails" target="_Blank">Post_Thumbnails</a></small>
+					</div>
 				</div>
 			</div>
 		
@@ -132,6 +148,25 @@ $cfg = $this->options;  ?>
 				</div>
 			</div>
 		
+			<div id="advancedfetching" class="postbox">
+				<h3 class="hndle"><span><?php _e('Advanced Fetching', self :: TEXTDOMAIN ); ?></span></h3>
+				<div class="inside">
+					<p></p>
+					<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['force_mysimplepie'],true); ?> name="force_mysimplepie" id="force_mysimplepie" /> <?php _e('Force <b><i>Custom Simplepie Library</i></b>', self :: TEXTDOMAIN ); ?><br />
+					<div id="hlpspl" style="padding-left:20px;"><?php _e('Check this if you want to ignore Wordpress Simplepie library. ', self :: TEXTDOMAIN ); ?></div>
+					<br /> 
+
+					<p></p>
+					<input class="checkbox" value="1" type="checkbox" <?php checked($cfg['woutfilter'],true); ?> name="woutfilter" id="woutfilter" /> <?php _e('<b><i>Allow option on campaign for skip the content filters</i></b>', self :: TEXTDOMAIN ); ?><br />
+					<div id="hlpspl" style="padding-left:20px;"><?php _e('NOTE: It is extremely dangerous to allow unfiltered content because there may be some vulnerability in the source code.', self :: TEXTDOMAIN ); ?>
+					<br /><?php _e('See How WordPress Processes Post Content: ', self :: TEXTDOMAIN ); ?><a href="http://codex.wordpress.org/How_WordPress_Processes_Post_Content" target="_blank">http://codex.wordpress.org/How_WordPress_Processes_Post_Content</a>
+					<br />
+					</div>
+					<br /> 
+
+				</div>
+			</div>
+
 			<div id="enabledashboard" class="postbox">
 				<h3 class="hndle"><span><?php _e('Dashboard widget', self :: TEXTDOMAIN ); ?></span></h3>
 				<div class="inside">
@@ -189,4 +224,21 @@ $cfg = $this->options;  ?>
 		</form>
 	</div>
 </div>
-	
+<script type="text/javascript" language="javascript">
+//jQuery(document).ready(function($){
+	jQuery('#imgcache').click(function() {
+		if ( true == jQuery('#imgcache').is(':checked')) {
+			jQuery('#nolinkimg').fadeIn();
+		} else {
+			jQuery('#nolinkimg').fadeOut();
+		}
+	});
+	jQuery('#imgattach').click(function() {
+		if ( true == jQuery('#imgattach').is(':checked')) {
+			jQuery('#featimg').fadeIn();
+		} else {
+			jQuery('#featimg').fadeOut();
+		}
+	});
+//}
+</script>

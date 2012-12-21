@@ -11,7 +11,7 @@ class wpematico_campaign_fetch_functions {
 	function isDuplicate(&$campaign, &$feed, &$item) {
 		// Agregar variables para chequear duplicados solo de esta campaña o de cada feed ( grabados en post_meta) o por titulo y permalink
 		global $wpdb, $wp_locale, $current_blog;
-		$table_name = $wpdb->prefix . "posts";  
+		$table_name = $wpdb->prefix . "posts";
 		$blog_id 	= @$current_blog->blog_id;
 		
 		$title = $wpdb->escape($item->get_title()); // $item->get_permalink();
@@ -65,11 +65,20 @@ class wpematico_campaign_fetch_functions {
 		if( $this->cfg['nonstatic'] ) { $current_item = NoNStatic :: content($current_item,$campaign,$item); }else $current_item['content'] = $item->get_content();
 		if($this->current_item == -1 ) return -1;
 		if( $this->cfg['nonstatic'] ) { $current_item = NoNStatic :: content2($current_item,$campaign,$item); }else $current_item['content'] = $item->get_content();
-		 // Template parse           
+		
+		 // take out links before apply template
+		if ($campaign['campaign_strip_links']){
+			trigger_error(__('Cleaning Links from content.', WPeMatico :: TEXTDOMAIN ),E_USER_NOTICE);
+			$current_item['content'] = $this->strip_links((string)$current_item['content']);
+		}
+		
+		// Template parse           
 		if ($campaign['campaign_enable_template']){
+			trigger_error(__('Parsing Post template.', WPeMatico :: TEXTDOMAIN ),E_USER_NOTICE);
 			$vars = array(
 				'{content}',
 				'{title}',
+				'{image}',
 				'{author}',
 				'{authorlink}',
 				'{permalink}',
@@ -90,6 +99,7 @@ class wpematico_campaign_fetch_functions {
 			$replace = array(
 				$current_item['content'],
 				$current_item['title'],
+				"[[[wpe1stimg]]]",
 				$autor,
 				$autorlink,
 				$item->get_link(),
@@ -105,24 +115,25 @@ class wpematico_campaign_fetch_functions {
 		}
 	
 	 // Rewrite
-		$rewrites = $campaign['campaign_rewrites'];
-		for ($i = 0; $i < count($campaign['campaign_rewrites']['origin']); $i++) {
-			$origin = $campaign['campaign_rewrites']['origin'][$i];
-			if(isset($campaign['campaign_rewrites']['rewrite'][$i])) {
-			  $reword = !empty($campaign['campaign_rewrites']['relink'][$i]) 
-							  ? '<a href="'. $campaign['campaign_rewrites']['relink'][$i] .'">' . $campaign['campaign_rewrites']['rewrite'][$i] . '</a>' 
-							  : $campaign['campaign_rewrites']['rewrite'][$i];
-			  
-			if($campaign['campaign_rewrites']['regex'][$i]) {
-				$current_item['content'] = preg_replace($origin, stripslashes($reword), $current_item['content']);
-			}else
-				$current_item['content'] = str_ireplace($origin, stripslashes($reword), $current_item['content']);
-			}else if(!empty($campaign['campaign_rewrites']['relink'][$i]))
-				$current_item['content'] = str_ireplace($origin, '<a href="'. stripslashes($campaign['campaign_rewrites']['relink'][$i]) .'">' . $origin . '</a>', $current_item['content']);
-		}
+		//$rewrites = $campaign['campaign_rewrites'];
+		if (isset($campaign['campaign_rewrites']['origin']))
+			for ($i = 0; $i < count($campaign['campaign_rewrites']['origin']); $i++) {
+				$origin = stripslashes($campaign['campaign_rewrites']['origin'][$i]);
+				if(isset($campaign['campaign_rewrites']['rewrite'][$i])) {
+					$reword = !empty($campaign['campaign_rewrites']['relink'][$i]) 
+								  ? '<a href="'. stripslashes($campaign['campaign_rewrites']['relink'][$i]) .'">' . stripslashes($campaign['campaign_rewrites']['rewrite'][$i]) . '</a>' 
+								  : stripslashes($campaign['campaign_rewrites']['rewrite'][$i]);
+				  
+					if($campaign['campaign_rewrites']['regex'][$i]) {
+						$current_item['content'] = preg_replace($origin, $reword, $current_item['content']);
+					}else
+						$current_item['content'] = str_ireplace($origin, $reword, $current_item['content']);
+				}else if(!empty($campaign['campaign_rewrites']['relink'][$i]))
+					$current_item['content'] = str_ireplace($origin, '<a href="'. stripslashes($campaign['campaign_rewrites']['relink'][$i]) .'">' . $origin . '</a>', $current_item['content']);
+			}
 		// End rewrite
 
-		if ( !$this->cfg['disable_credits']) {$current_item['content'] .= '<p class="wpematico_credit">Powered by <a href="http://www.netmdp.com/wpematico/" target="_blank">WPeMatico</a></p>'; }
+		if ( !$this->cfg['disable_credits']) {$current_item['content'] .= '<p class="wpematico_credit"><small>Powered by <a href="http://www.wpematico.com" target="_blank">WPeMatico</a></small></p>'; }
 		
 		return $current_item;
 	} // End ParseItemContent
@@ -142,29 +153,32 @@ class wpematico_campaign_fetch_functions {
 		//Proceso Words to Category y si hay las agrego al array
 		if ( $this->cfg['enableword2cats']) {
 			trigger_error(sprintf(__('Processing Words to Category %1s', WPeMatico :: TEXTDOMAIN ), $current_item['title'] ),E_USER_NOTICE);
-			$wrd2cats = $campaign['campaign_wrd2cat'];
-			for ($i = 0; $i < count($campaign['campaign_wrd2cat']['word']); $i++) {
-				$foundit = false;
-				$word = @$campaign['campaign_wrd2cat']['word'][$i];
-				if(isset($campaign['campaign_wrd2cat']['w2ccateg'][$i])) {
-					$tocat = $campaign['campaign_wrd2cat']['w2ccateg'][$i];
-					if($campaign['campaign_wrd2cat']['regex'][$i]) {
-						$foundit = (preg_match($word, $current_item['content'])) ? true : false; 
-					}else{
-						if($campaign['campaign_wrd2cat']['cases'][$i]) 
-							$foundit = strpos($current_item['content'], $word);
-						else $foundit = stripos($current_item['content'], $word); //insensible a May/min
-					}
-					if ($foundit !== false ) {
-						trigger_error(sprintf(__('Found!: word %1s to Cat_id %2s', WPeMatico :: TEXTDOMAIN ),$word,$tocat),E_USER_NOTICE);
-						$current_item['categories'][] = $tocat;
-					}else{
-						trigger_error(sprintf(__('Not found word %1s', WPeMatico :: TEXTDOMAIN ),$word),E_USER_NOTICE);
+			//$wrd2cats = $campaign['campaign_wrd2cat'];
+			if (isset($campaign['campaign_wrd2cat']['word']))
+				for ($i = 0; $i < count($campaign['campaign_wrd2cat']['word']); $i++) {
+					$foundit = false;
+					$word = stripslashes(@$campaign['campaign_wrd2cat']['word'][$i]);
+					if(isset($campaign['campaign_wrd2cat']['w2ccateg'][$i])) {
+						$tocat = $campaign['campaign_wrd2cat']['w2ccateg'][$i];
+						if($campaign['campaign_wrd2cat']['regex'][$i]) {
+							$foundit = (preg_match($word, $current_item['content'])) ? true : false; 
+						}else{
+							if($campaign['campaign_wrd2cat']['cases'][$i]) 
+								$foundit = strpos($current_item['content'], $word);
+							else $foundit = stripos($current_item['content'], $word); //insensible a May/min
+						}
+						if ($foundit !== false ) {
+							trigger_error(sprintf(__('Found!: word %1s to Cat_id %2s', WPeMatico :: TEXTDOMAIN ),$word,$tocat),E_USER_NOTICE);
+							$current_item['categories'][] = $tocat;
+						}else{
+							trigger_error(sprintf(__('Not found word %1s', WPeMatico :: TEXTDOMAIN ),$word),E_USER_NOTICE);
+						}
 					}
 				}
-			}
 		}	// End Words to Category
-		
+		//Tags
+		if( $this->cfg['nonstatic'] ) { $current_item = NoNStatic :: postags($current_item,$campaign, $item ); }else $current_item['tags'] = explode(',', $campaign['tags']);
+
 		return $current_item;
 	} // End item filters
     
@@ -233,37 +247,33 @@ class wpematico_campaign_fetch_functions {
    * @param   $feed           object    Feed database object
    * @param   $item           object    SimplePie_Item object
    */
-	function Item_images(&$current_item, &$campaign, &$feed, &$item) {  
+	function Item_images(&$current_item, &$campaign, &$feed, &$item) { 
         
 		if($this->cfg['imgcache'] || $campaign['campaign_imgcache']) {
-			$images = $this->parseImages($this->current_item['content']);
-			$this->current_item['images'] = $images[2];  //lista de url de imagenes
+			$images = $this->parseImages($current_item['content']);
+			$current_item['images'] = $images[2];  //lista de url de imagenes
             $itemUrl = $this->getReadUrl($item->get_permalink());
-            
-			$hayimg = false;
-			$addimg = false;
 			
-			if( sizeof($this->current_item['images']) ) { // Si hay alguna imagen en el contenido
-				$hayimg = true;
-			}else{
-				if( $this->cfg['nonstatic'] ) { $this->current_item['images'] = NoNStatic :: imgfind($current_item,$campaign,$item ); }
-			}
-			if( $hayimg || $addimg ) { // Si hay alguna imagen en el contenido
+			if( $this->cfg['nonstatic'] ) { $current_item['images'] = NoNStatic :: imgfind($current_item,$campaign,$item ); }
+			
+			if( sizeof($current_item['images']) ) { // Si hay alguna imagen en el contenido
 				trigger_error(__('Uploading images.', WPeMatico :: TEXTDOMAIN ),E_USER_NOTICE);
+				//trigger_error(print_r($current_item['images'],true),E_USER_NOTICE);
 				$img_new_url = array();
-				foreach($this->current_item['images'] as $imagen_src) {
-				    
+				foreach($current_item['images'] as $imagen_src) {
+				    trigger_error(__('Uploading image...', WPeMatico :: TEXTDOMAIN ).$imagen_src,E_USER_NOTICE);
 					if($this->campaign['campaign_cancel_imgcache']) {
-						if($this->campaign['campaign_nolinkimg']) 
+						if($this->cfg['gralnolinkimg'] || $this->campaign['campaign_nolinkimg']) 
 							$current_item['content'] = str_replace($imagen_src, '', $current_item['content']);  // Si no quiere linkar las img al server borro el link de la imagen						
 					}else {
+						//$imagen_src = str_replace('_s.','_n.', $imagen_src);  //Trae la imagen grande en vez del thumb
                         $imagen_src_real = $this->getRelativeUrl($itemUrl, $imagen_src);
 						$bits = @file_get_contents($imagen_src_real);
 						$name = str_replace(array(' ','%20'),'_',substr(strrchr($imagen_src, "/"),1));
 						$afile = wp_upload_bits( $name, NULL, $bits);
 						if(!$afile['error']) {
-							if($addimg) $current_item['content'] = "<img class=\"wpe_imgrss\" src=\"" . $afile['url'] . "\">".$current_item['content'];
-							else $current_item['content'] = str_replace($imagen_src, $afile['url'], $current_item['content']);
+							trigger_error($afile['url'],E_USER_NOTICE);
+							$current_item['content'] = str_replace($imagen_src, $afile['url'], $current_item['content']);
 							$img_new_url[] = $afile['url'];
 						} else {  // Si no la pudo subir intento con mi funcion
 							trigger_error('wp_upload_bits error:'.print_r($afile,true).', trying custom function.',E_USER_WARNING);
@@ -275,11 +285,10 @@ class wpematico_campaign_fetch_functions {
 								trigger_error('imagen_src='.$imagen_src.' <b>to</b> imagen_dst='.$imagen_dst.'<br>',E_USER_NOTICE);
 								$newfile = $this->guarda_imagen($imagen_src_real, $imagen_dst);
 								if($newfile) {	
-									if($addimg) $current_item['content'] = "<img class=\"wpe_imgrss\" src=\"" . $imagen_dst_url . "\">".$current_item['content'];
-									else $current_item['content'] = str_replace($imagen_src, $imagen_dst_url, $current_item['content']);
+									$current_item['content'] = str_replace($imagen_src, $imagen_dst_url, $current_item['content']);
 									$img_new_url[] = $imagen_dst_url;
 								} else {
-									if($this->campaign['campaign_nolinkimg']) $current_item['content'] = str_replace($imagen_src, '', $current_item['content']);  // Si no quiere linkar las img al server borro el link de la imagen
+									if($this->cfg['gralnolinkimg'] || $this->campaign['campaign_nolinkimg']) $current_item['content'] = str_replace($imagen_src, '', $current_item['content']);  // Si no quiere linkar las img al server borro el link de la imagen
 									trigger_error('Upload file failed:'.$imagen_dst,E_USER_WARNING);
 								}
 							}else {
@@ -287,17 +296,31 @@ class wpematico_campaign_fetch_functions {
 							}
 						}
 					}
-				} 
-				$this->current_item['images'] = (array)$img_new_url;
-			}  // $hayimg || $addimg
+				}
+				$current_item['images'] = (array)$img_new_url;
+			}  // // Si hay alguna imagen en el contenido
 		}		
 		return $current_item;		
 	}  // item images
 
 
+	function Item_parseimg(&$current_item, &$campaign, &$feed, &$item) {
+		if ( preg_match("[[[wpe1stimg]]]", $current_item['content']) ) {  // en el content
+			$imgenc = $current_item['images'][0];
+			$imgstr = "<img class=\"wpe_imgrss\" src=\"" . $imgenc . "\">";  //Solo la imagen
+
+			$current_item['content'] = str_ireplace("[[[wpe1stimg]]]",$imgstr, $current_item['content']);
+		}
+		return $current_item;
+	}
+
+
+
 	/*** Devuelve todas las imagenes del contenido	*/
 	function parseImages($text){    
-		preg_match_all('/<img(.+?)src=\"(.+?)\"(.*?)>/', $text, $out);
+		preg_match_all('/<img(.+?)src=\"(.+?)\"(.*?)>/', $text, $out);  //for tag img
+		preg_match_all('/<link rel=\"(.+?)\" type=\"image\/jpg\" href=\"(.+?)\"(.+?)\/>/', $text, $out2); // for rel=enclosure
+		array_push($out,$out2);  // sum all items to array 
 		return $out;
 	}
  
@@ -305,17 +328,21 @@ class wpematico_campaign_fetch_functions {
 	/*** Adjunta un archivo ya subido al postid dado  */
  	function insertfileasattach($filename,$postid) {
   		$wp_filetype = wp_check_filetype(basename($filename), null );
+		$wp_upload_dir = wp_upload_dir();
 		$attachment = array(
+		  'guid' => $filename, 
 		  'post_mime_type' => $wp_filetype['type'],
 		  'post_title' => preg_replace('/\.[^.]+$/', '', basename($filename)),
 		  'post_content' => '',
 		  'post_status' => 'inherit'
 		);
-		$attach_id = wp_insert_attachment( $attachment, $filename, $postid );
 		trigger_error(__('Attaching file:').$filename,E_USER_NOTICE);
+		$relfilename=str_replace($wp_upload_dir['baseurl'], '', $filename);
+//		trigger_error(__('Attaching file relfilename:').$relfilename,E_USER_NOTICE);
+		$attach_id = wp_insert_attachment( $attachment,  $relfilename, $postid );
 		if (!$attach_id)
 			trigger_error(__('Sorry, your attach could not be inserted. Something wrong happened.').print_r($filename,true),E_USER_WARNING);
-		// you must first include the image.php file for the function wp_generate_attachment_metadata() to work
+		// must include the image.php file for the function wp_generate_attachment_metadata() to work
 		require_once(ABSPATH . "wp-admin" . '/includes/image.php');
 		$attach_data = wp_generate_attachment_metadata( $attach_id, $filename );
 		wp_update_attachment_metadata( $attach_id,  $attach_data );
@@ -354,7 +381,14 @@ class wpematico_campaign_fetch_functions {
 		}
 	} 
 
+	function strip_links($text) {
+	    $tags = array('a','iframe','script');
+	    foreach ($tags as $tag){
+	        while(preg_match('/<'.$tag.'(|\W[^>]*)>(.*)<\/'. $tag .'>/iusU', $text, $found)){
+	            $text = str_replace($found[0],$found[2],$text);
+	        }
+	    }
+	    return preg_replace('/(<('.join('|',$tags).')(|\W.*)\/>)/iusU', '', $text);
+	}
 
-
- 
 } // class
