@@ -9,7 +9,6 @@ if ( !defined('ABSPATH') )
 	else return;
  	
 if ( class_exists( 'WPeMatico_Campaigns' ) ) return;
-
 class WPeMatico_Campaigns {
 
 	public function init() {
@@ -24,6 +23,8 @@ class WPeMatico_Campaigns {
 		add_action('manage_wpematico_posts_custom_column',array(&$this,'custom_wpematico_column'),10,2);
 		add_filter('post_row_actions' , array( &$this, 'wpematico_quick_actions'), 10, 2);
 		add_filter("manage_edit-wpematico_sortable_columns", array( &$this, "sortable_columns") );
+		//BULK ACTIONS
+		add_filter('views_edit-wpematico', array( &$this, 'my_views_filter') );
 		//QUICK ACTIONS
 		add_action('admin_action_wpematico_copy_campaign', array( &$this, 'wpematico_copy_campaign'));
 		add_action('admin_action_wpematico_toggle_campaign', array(&$this, 'wpematico_toggle_campaign'));
@@ -34,6 +35,14 @@ class WPeMatico_Campaigns {
 
 		add_action('admin_print_styles-edit.php', array(&$this,'list_admin_styles'));
 		add_action('admin_print_scripts-edit.php', array(&$this,'list_admin_scripts'));
+	}
+
+	function my_views_filter($links) {
+		global $post;
+		if($post->post_type != 'wpematico') return $links;
+		
+		$links['wpematico'] = __('Visit', WPeMatico :: TEXTDOMAIN).' <a href="http://www.wpematico.com" target="_Blank">www.wpematico.com</a>';
+		return $links;
 	}
 	
   	function list_admin_styles(){
@@ -50,11 +59,16 @@ class WPeMatico_Campaigns {
 	function campaigns_list_admin_head() {
 		global $post;
 		if($post->post_type != 'wpematico') return $post_id;
-		?>
+			$runallbutton = '<div style="margin: 2px 5px 0 0;float:left;background-color: #FFF52F;" id="run_all" onclick="javascript:run_all();" class="button-primary">'. __('Run Selected Campaigns', WPeMatico :: TEXTDOMAIN ) . '</div>';
+		?>		
 		<script type="text/javascript" language="javascript">
+			jQuery(document).ready(function($){
+				$('div.tablenav.top').prepend('<?php echo $runallbutton; ?>');
+			});
+			
 			function run_now(c_ID) {
-				jQuery.ajaxSetup({async:false});
-				jQuery('#fieldserror').remove();
+				jQuery('html').css('cursor','wait');
+				jQuery("div[id=fieldserror]").remove();
 				msgdev="<img width='12' src='<?php echo get_bloginfo('wpurl'); ?>/wp-admin/images/wpspin_light.gif' class='mt2'> <?php _e('Running Campaign...', WPeMatico :: TEXTDOMAIN ); ?>";
 				jQuery(".subsubsub").prepend('<div id="fieldserror" class="updated fade he20">'+msgdev+'</div>');
 				var data = {
@@ -68,9 +82,37 @@ class WPeMatico_Campaigns {
 					}else{
 						jQuery(".subsubsub").prepend('<div id="fieldserror" class="updated fade">'+msgdev+'</div>');
 					}
+					jQuery('html').css('cursor','auto');
 				});
-			};
-		</script>
+			}
+ 			function run_all() {
+				var selectedItems = new Array();
+				jQuery("input[name='post[]']:checked").each(function() {selectedItems.push(jQuery(this).val());});
+				if (selectedItems .length == 0) {alert("<?php _e('Please select campaign(s) to Run.', WPeMatico :: TEXTDOMAIN ); ?>"); return; }
+				
+				jQuery('html').css('cursor','wait');
+				jQuery('#fieldserror').remove();
+				msgdev="<img width='12' src='<?php echo get_bloginfo('wpurl'); ?>/wp-admin/images/wpspin_light.gif' class='mt2'> <?php _e('Running Campaign...', WPeMatico :: TEXTDOMAIN ); ?>";
+				jQuery(".subsubsub").prepend('<div id="fieldserror" class="updated fade he20 ajaxstop">'+msgdev+'</div>');
+				jQuery("input[name='post[]']:checked").each(function() {
+					c_id = jQuery(this).val();
+					var data = {
+						campaign_ID: c_id ,
+						action: "runnowx"
+					};
+					jQuery.post(ajaxurl, data, function(msgdev) {  //si todo ok devuelve LOG sino 0
+						if( msgdev.substring(0, 5) == 'ERROR' ){
+							jQuery(".subsubsub").prepend('<div id="fieldserror" class="error fade">'+msgdev+'</div>');
+						}else{
+							jQuery(".subsubsub").prepend('<div id="fieldserror" class="updated fade">'+msgdev+'</div>');
+						}
+					});
+				}).ajaxStop(function() {
+					jQuery('html').css('cursor','auto');
+					jQuery('.ajaxstop').remove().ajaxStop();
+				});
+			}
+ 		</script>
 		<?php
 	}
 
@@ -231,7 +273,7 @@ class WPeMatico_Campaigns {
 		if (! ( isset( $_GET['post']) || isset( $_POST['post'])  || ( isset($_REQUEST['action']) && 'wpematico_clear_campaign' == $_REQUEST['action'] ) ) ) {
 			wp_die(__('No campaign ID has been supplied!',  WPeMatico :: TEXTDOMAIN));
 		}
-		
+
 		// Get the original post
 		$id = (isset($_GET['post']) ? $_GET['post'] : $_POST['post']);
 		$campaign_data =   WPeMatico :: get_campaign( $id );
@@ -360,8 +402,8 @@ class WPeMatico_Campaigns {
 	}
 	
 	function custom_wpematico_column( $column, $post_id ) {
+		$cfg = get_option( WPeMatico :: OPTION_KEY);
 		$campaign_data = WPeMatico :: get_campaign ( $post_id );
-
 		switch ( $column ) {
 		  case 'status':
 			echo $campaign_data['campaign_posttype']; 
@@ -376,6 +418,14 @@ class WPeMatico_Campaigns {
 			$activated = $campaign_data['activated']; 
 			if ($starttime>0) {
 				$runtime=current_time('timestamp')-$starttime;
+				// Aca agregar control de tiempo y sacarla de en ejecucion ***********************************************************************
+				if(($cfg['campaign_timeout'] <= $runtime) && ($cfg['campaign_timeout']>0)) {
+					$campaign_data['lastrun'] = $starttime;
+					$campaign_data['lastruntime'] = ' <span style="color:red;">Timeout: '.$cfg['campaign_timeout'].'</span>';
+					$campaign_data['starttime']   = '';
+					$campaign_data['lastpostscount'] = 0; //  posts procesados esta vez
+					WPeMatico :: update_campaign($post_id, $campaign_data);  //Save Campaign new data
+				}
 				echo __('Running since:', WPeMatico :: TEXTDOMAIN ).' '.$runtime.' '.__('sec.', WPeMatico :: TEXTDOMAIN );
 			} elseif ($activated) {
 				echo date_i18n(get_option('date_format'),$cronnextrun).'-'. date_i18n(get_option('time_format'),$cronnextrun);
